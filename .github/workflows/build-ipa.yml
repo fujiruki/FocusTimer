@@ -8,11 +8,17 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
         run: xcodegen generate
+      - name: Test on iPhone Simulator
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $0 !~ /unavailable/ {print $2; exit}')"
+          test -n "$DEVICE_ID"
+          xcodebuild -project FocusTimer.xcodeproj -scheme FocusTimer -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/DerivedData-Test" CODE_SIGNING_ALLOWED=NO test
       - name: Build for iPhone
         run: |
           set -euo pipefail
@@ -25,7 +31,7 @@ jobs:
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry FocusTimer-unsigned.ipa Payload
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: FocusTimer-unsigned-ipa
           path: FocusTimer-unsigned.ipa

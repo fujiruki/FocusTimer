@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import AVFoundation
 import Speech
 
@@ -11,6 +12,8 @@ final class SpeechInput: ObservableObject {
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    private var recognitionID = UUID()
+    private var tapInstalled = false
 
     func toggle() {
         if listening {stop(); return}
@@ -36,23 +39,34 @@ final class SpeechInput: ObservableObject {
             let node = engine.inputNode
             let format = node.outputFormat(forBus: 0)
             node.installTap(onBus: 0, bufferSize: 1024, format:format) {buffer,_ in req.append(buffer)}
+            tapInstalled = true
             engine.prepare()
             try engine.start()
             listening = true
+            let id = UUID()
+            recognitionID = id
             task = recognizer?.recognitionTask(with:req) { [weak self] result,error in
                 Task { @MainActor in
-                    if let result {self?.text = result.bestTranscription.formattedString}
-                    if let error {self?.errorMessage = error.localizedDescription;self?.stop()}
+                    guard let self, self.recognitionID == id else {return}
+                    if let result {
+                        self.text = result.bestTranscription.formattedString
+                        if result.isFinal {self.stop();return}
+                    }
+                    if let error {self.errorMessage = error.localizedDescription;self.stop()}
                 }
             }
         } catch {errorMessage = error.localizedDescription;stop()}
     }
     func stop() {
-        if engine.isRunning {engine.stop();engine.inputNode.removeTap(onBus:0)}
-        request?.endAudio()
-        task?.cancel()
+        recognitionID = UUID()
+        let req = request
+        let currentTask = task
         task = nil
         request = nil
+        if engine.isRunning {engine.stop()}
+        if tapInstalled {engine.inputNode.removeTap(onBus:0);tapInstalled=false}
+        req?.endAudio()
+        currentTask?.cancel()
         listening = false
         try? AVAudioSession.sharedInstance().setActive(false)
     }

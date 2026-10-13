@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import UserNotifications
 
 struct WorkStep: Identifiable, Codable, Equatable {
@@ -42,22 +43,49 @@ struct SavedPlan: Codable {
 final class TimerStore: ObservableObject {
     @Published var goals: [DayGoal] = [] { didSet { save() } }
     @Published var session: WorkSession? { didSet { save() } }
-    @Published var startMinute: Int = 9*60 { didSet { save() } }
-    @Published var endMinute: Int = 18*60 { didSet { save() } }
-    private let key = "focus-timer-daily-v1"
+    @Published var startMinute: Int = 9*60 { didSet { normalizeMinutes(changed:.start) } }
+    @Published var endMinute: Int = 18*60 { didSet { normalizeMinutes(changed:.end) } }
+    static let storageKey = "focus-timer-daily-v1"
+    private enum MinuteChange {case start,end}
+    private let defaults: UserDefaults
+    private let now: () -> Date
+    private var normalizingMinutes = false
 
-    init() {
-        if let data = UserDefaults.standard.data(forKey: key),
+    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = {Date()}, calendar: Calendar = .current) {
+        self.defaults = defaults
+        self.now = now
+        if let data = defaults.data(forKey: Self.storageKey),
            let value = try? JSONDecoder().decode(SavedPlan.self, from: data) {
-            goals = Calendar.current.isDateInToday(value.date) ? value.goals : []
-            session = value.session
+            let sameDay = calendar.isDate(value.date, inSameDayAs: now())
+            goals = sameDay ? value.goals : []
+            session = sameDay ? value.session : nil
             startMinute = value.startMinute
             endMinute = value.endMinute
+            normalizeMinutes(changed:nil, saveAfter:false)
+            if !sameDay { clearNotices() }
+            save()
         }
     }
     private func save() {
-        let data = SavedPlan(date: .now, goals: goals, session: session, startMinute: startMinute, endMinute: endMinute)
-        if let encoded = try? JSONEncoder().encode(data) { UserDefaults.standard.set(encoded, forKey: key) }
+        let data = SavedPlan(date: now(), goals: goals, session: session, startMinute: startMinute, endMinute: endMinute)
+        if let encoded = try? JSONEncoder().encode(data) { defaults.set(encoded, forKey: Self.storageKey) }
+    }
+    private func normalizeMinutes(changed: MinuteChange?, saveAfter: Bool = true) {
+        guard !normalizingMinutes else {return}
+        normalizingMinutes = true
+        startMinute = min(max(startMinute,0),1439)
+        endMinute = min(max(endMinute,1),1440)
+        if startMinute >= endMinute {
+            switch changed {
+            case .start:startMinute = max(0,endMinute-1)
+            case .end:endMinute = min(1440,startMinute+1)
+            case nil:
+                endMinute = min(1440,startMinute+1)
+                if startMinute >= endMinute {startMinute = max(0,endMinute-1)}
+            }
+        }
+        normalizingMinutes = false
+        if saveAfter {save()}
     }
     func addGoal(_ title: String) {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -73,14 +101,18 @@ final class TimerStore: ObservableObject {
         guard let gi = goals.firstIndex(where: {$0.id == goal}), let si = goals[gi].steps.firstIndex(where: {$0.id == step}) else {return}
         goals[gi].steps[si].done.toggle()
     }
+    func setStepDone(goal: UUID, step: UUID, done: Bool = true) {
+        guard let gi = goals.firstIndex(where: {$0.id == goal}), let si = goals[gi].steps.firstIndex(where: {$0.id == step}) else {return}
+        goals[gi].steps[si].done = done
+    }
     func start(_ title: String, minutes: Int, goal: UUID? = nil, step: UUID? = nil) {
         guard session == nil, minutes > 0 else { return }
-        session = WorkSession(title: title, goalID: goal, stepID: step, originalSeconds: TimeInterval(minutes*60), runStartedAt: .now)
+        session = WorkSession(title: title, goalID: goal, stepID: step, originalSeconds: TimeInterval(minutes*60), runStartedAt: now())
         scheduleNotices()
     }
     func pause() {
         guard var s = session, !s.paused else { return }
-        s.elapsedBeforeRun = s.elapsed(at: .now)
+        s.elapsedBeforeRun = s.elapsed(at: now())
         s.runStartedAt = nil
         s.paused = true
         session = s
@@ -88,7 +120,7 @@ final class TimerStore: ObservableObject {
     }
     func resume() {
         guard var s = session, s.paused else { return }
-        s.runStartedAt = .now
+        s.runStartedAt = now()
         s.paused = false
         session = s
         scheduleNotices()
@@ -111,7 +143,7 @@ final class TimerStore: ObservableObject {
     }
     func finish(markStepDone: Bool) {
         guard let s = session else {return}
-        if markStepDone, let g = s.goalID, let step = s.stepID { toggleStep(goal:g, step:step) }
+        if markStepDone, let g = s.goalID, let step = s.stepID { setStepDone(goal:g, step:step) }
         clearNotices()
         session = nil
     }
@@ -121,7 +153,7 @@ final class TimerStore: ObservableObject {
     func scheduleNotices() {
         clearNotices()
         guard let s = session, !s.paused else { return }
-        let remaining = s.remaining(at: .now)
+        let remaining = s.remaining(at: now())
         let content = UNMutableNotificationContent()
         content.title = "作業の確認"
         content.body = s.finishCondition.isEmpty ? s.title : s.finishCondition

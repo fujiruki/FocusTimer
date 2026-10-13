@@ -23,3 +23,27 @@ targets:
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         CODE_SIGNING_ALLOWED: NO
+  FocusTimerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [FocusTimerTests]
+    dependencies:
+      - target: FocusTimer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer.tests
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+schemes:
+  FocusTimer:
+    build:
+      targets:
+        FocusTimer: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FocusTimerTests
+    archive:
+      config: Release

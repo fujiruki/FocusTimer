@@ -54,8 +54,8 @@ struct HomeView: View {
             Text("現在 \(now.formatted(date:.omitted,time:.shortened))　活動終了まで \(max(0,store.endMinute - (Calendar.current.component(.hour,from:now)*60 + Calendar.current.component(.minute,from:now))))分")
                 .font(.subheadline)
             HStack {
-                Stepper("活動開始 \(store.startMinute/60)時",value:$store.startMinute,in:0...1380,step:60)
-                Stepper("終了 \(store.endMinute/60)時",value:$store.endMinute,in:60...1440,step:60)
+                Stepper("活動開始 \(store.startMinute/60)時",value:$store.startMinute,in:0...max(0,store.endMinute-60),step:60)
+                Stepper("終了 \(store.endMinute/60)時",value:$store.endMinute,in:min(1440,store.startMinute+60)...1440,step:60)
             }.font(.caption)
             Text("活動終了までの時間は、実際の作業可能時間とは異なります。").font(.caption2).foregroundStyle(.secondary)
         }.cardStyle()
