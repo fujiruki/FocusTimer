@@ -1,0 +1,32 @@
+name: Build unsigned iPhone IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build for iPhone
+        run: |
+          set -euo pipefail
+          xcodebuild -project FocusTimer.xcodeproj -scheme FocusTimer -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" CODE_SIGNING_ALLOWED=NO build
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/FocusTimer.app"
+          test -d "$APP"
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry FocusTimer-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FocusTimer-unsigned-ipa
+          path: FocusTimer-unsigned.ipa
+          if-no-files-found: error

@@ -1,0 +1,7 @@
+*.xcodeproj/
+DerivedData/
+build/
+Payload/
+*.ipa
+FocusTimer/Info.plist
+.DS_Store

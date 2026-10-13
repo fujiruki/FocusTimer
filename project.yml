@@ -1,0 +1,25 @@
+name: FocusTimer
+options:
+  bundleIdPrefix: lab.akeru
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  FocusTimer:
+    type: application
+    platform: iOS
+    sources: [FocusTimer]
+    info:
+      path: FocusTimer/Info.plist
+      properties:
+        CFBundleDisplayName: フォーカスタイマー
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: 作業を声で入力するためにマイクを使います。
+        NSSpeechRecognitionUsageDescription: 話した作業名をテキストに変換します。
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        CODE_SIGNING_ALLOWED: NO
