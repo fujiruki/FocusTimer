@@ -59,8 +59,10 @@ final class TimerStore: ObservableObject {
             let sameDay = calendar.isDate(value.date, inSameDayAs: now())
             goals = sameDay ? value.goals : []
             session = sameDay ? value.session : nil
+            normalizingMinutes = true
             startMinute = value.startMinute
             endMinute = value.endMinute
+            normalizingMinutes = false
             normalizeMinutes(changed:nil, saveAfter:false)
             if !sameDay { clearNotices() }
             save()
