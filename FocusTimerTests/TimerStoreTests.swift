@@ -19,17 +19,67 @@ final class TimerStoreTests: XCTestCase {
         XCTAssertEqual(store.goals[0].steps[0].done,true)
     }
 
-    func testStartMinuteStaysBeforeEndMinute() {
+    func testStartAndEndMinutesKeepAtLeastOneHourApart() {
         let (defaults,suiteName) = makeDefaults()
         defer {clear(suiteName)}
         let current = makeDate(2026,10,14,9,0)
         let store = TimerStore(defaults:defaults,now:{current},calendar:calendar)
 
         store.startMinute = store.endMinute
-        XCTAssertLessThan(store.startMinute,store.endMinute)
+        XCTAssertGreaterThanOrEqual(store.endMinute - store.startMinute,60)
+        XCTAssertGreaterThanOrEqual(store.startMinute,0)
+        XCTAssertLessThanOrEqual(store.startMinute,1380)
+        XCTAssertGreaterThanOrEqual(store.endMinute,60)
+        XCTAssertLessThanOrEqual(store.endMinute,1440)
 
         store.endMinute = store.startMinute
-        XCTAssertLessThan(store.startMinute,store.endMinute)
+        XCTAssertGreaterThanOrEqual(store.endMinute - store.startMinute,60)
+        XCTAssertGreaterThanOrEqual(store.startMinute,0)
+        XCTAssertLessThanOrEqual(store.startMinute,1380)
+        XCTAssertGreaterThanOrEqual(store.endMinute,60)
+        XCTAssertLessThanOrEqual(store.endMinute,1440)
+    }
+
+    func testStartAndEndMinutesClampToHomeViewBounds() {
+        let (defaults,suiteName) = makeDefaults()
+        defer {clear(suiteName)}
+        let current = makeDate(2026,10,14,9,0)
+        let store = TimerStore(defaults:defaults,now:{current},calendar:calendar)
+
+        store.endMinute = 1440
+        store.startMinute = 24*60
+        XCTAssertEqual(store.startMinute,1380)
+        XCTAssertEqual(store.endMinute,1440)
+
+        store.startMinute = 0
+        store.endMinute = 0
+        XCTAssertEqual(store.startMinute,0)
+        XCTAssertEqual(store.endMinute,60)
+        XCTAssertGreaterThanOrEqual(store.endMinute - store.startMinute,60)
+        XCTAssertGreaterThanOrEqual(store.startMinute,0)
+        XCTAssertLessThanOrEqual(store.startMinute,1380)
+        XCTAssertGreaterThanOrEqual(store.endMinute,60)
+        XCTAssertLessThanOrEqual(store.endMinute,1440)
+    }
+
+    func testLoadingEqualStartAndEndMinutesExpandsToOneHour() throws {
+        let (defaults,suiteName) = makeDefaults()
+        defer {clear(suiteName)}
+        let current = makeDate(2026,10,14,9,0)
+        let saved = SavedPlan(
+            date:current,
+            goals:[],
+            session:nil,
+            startMinute:18*60,
+            endMinute:18*60
+        )
+        defaults.set(try JSONEncoder().encode(saved),forKey:TimerStore.storageKey)
+
+        let store = TimerStore(defaults:defaults,now:{current},calendar:calendar)
+
+        XCTAssertEqual(store.startMinute,18*60)
+        XCTAssertEqual(store.endMinute,19*60)
+        XCTAssertEqual(store.endMinute - store.startMinute,60)
     }
 
     func testLoadingPreviousDayClearsGoalsAndSession() throws {

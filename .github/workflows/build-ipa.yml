@@ -16,7 +16,20 @@ jobs:
       - name: Test on iPhone Simulator
         run: |
           set -euo pipefail
-          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && $0 !~ /unavailable/ {print $2; exit}')"
+          DEVICE_ID="$(python3 - <<'PY'
+          import json
+          import subprocess
+
+          data = json.loads(subprocess.check_output(["xcrun","simctl","list","devices","available","-j"]))
+          for devices in data.get("devices",{}).values():
+              for device in devices:
+                  identifier = device.get("deviceTypeIdentifier","")
+                  if device.get("isAvailable") and identifier.startswith("com.apple.CoreSimulator.SimDeviceType.iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          raise SystemExit("No available iPhone simulator")
+          PY
+          )"
           test -n "$DEVICE_ID"
           xcodebuild -project FocusTimer.xcodeproj -scheme FocusTimer -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath "$RUNNER_TEMP/DerivedData-Test" CODE_SIGNING_ALLOWED=NO test
       - name: Build for iPhone

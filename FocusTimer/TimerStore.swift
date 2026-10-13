@@ -73,15 +73,15 @@ final class TimerStore: ObservableObject {
     private func normalizeMinutes(changed: MinuteChange?, saveAfter: Bool = true) {
         guard !normalizingMinutes else {return}
         normalizingMinutes = true
-        startMinute = min(max(startMinute,0),1439)
-        endMinute = min(max(endMinute,1),1440)
-        if startMinute >= endMinute {
+        startMinute = min(max(startMinute,0),1380)
+        endMinute = min(max(endMinute,60),1440)
+        if startMinute + 60 > endMinute {
             switch changed {
-            case .start:startMinute = max(0,endMinute-1)
-            case .end:endMinute = min(1440,startMinute+1)
+            case .start:startMinute = max(0,endMinute-60)
+            case .end:endMinute = min(1440,startMinute+60)
             case nil:
-                endMinute = min(1440,startMinute+1)
-                if startMinute >= endMinute {startMinute = max(0,endMinute-1)}
+                endMinute = min(1440,startMinute+60)
+                if startMinute + 60 > endMinute {startMinute = max(0,endMinute-60)}
             }
         }
         normalizingMinutes = false
