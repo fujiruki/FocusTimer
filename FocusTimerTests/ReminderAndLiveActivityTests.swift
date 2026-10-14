@@ -102,6 +102,7 @@ final class LiveActivityContentTests: XCTestCase {
 private final class FakeNotifications: NotificationScheduling {
     var pending: [PlannedNotice] = []
     func removePending(_ identifiers: [String]) {pending.removeAll {identifiers.contains($0.identifier)}}
+    func removeDelivered(_ identifiers: [String]) {}
     func add(_ notice: PlannedNotice) {pending.append(notice)}
     func requestAuthorization() {}
 }
@@ -239,5 +240,134 @@ final class SessionGoalAndBuildInfoTests: XCTestCase {
         XCTAssertNil(info.builtAt)
         XCTAssertFalse(info.isRecent(at:Date()))
         XCTAssertEqual(info.label(),"ビルド #1（local）")
+    }
+}
+
+private final class FakeEndAlarm: EndAlarmScheduling {
+    var isAvailable: Bool
+    var scheduled: [EndAlarmRequest] = []
+    var cancelCount = 0
+    var authorizationRequests = 0
+    init(available: Bool) {isAvailable = available}
+    func requestAuthorization() {authorizationRequests += 1}
+    func schedule(_ request: EndAlarmRequest) {scheduled.append(request)}
+    func cancel() {cancelCount += 1}
+}
+
+final class EndRoutingPlannerTests: XCTestCase {
+    func testOnceUsesShortSelectedSound() {
+        let notices = ReminderPlanner.plan(remaining:600,intervalMinutes:0,headline:"A",goalTitle:nil,endSound:.bell,endRouting:.notification)
+        XCTAssertEqual(notices.map(\.identifier),["focus-last","focus-end"])
+        XCTAssertEqual(notices[0].sound,"focus_chime.wav")
+        XCTAssertEqual(notices[1].sound,"alarm_bell.wav")
+    }
+
+    func testRepeatingAddsTwentyFollowUpsEveryThirtySeconds() {
+        let notices = ReminderPlanner.plan(remaining:600,intervalMinutes:0,headline:"A",goalTitle:nil,endSound:.marimba,endRouting:.repeatingNotifications)
+        let repeats = notices.filter {$0.identifier.hasPrefix("focus-end-r")}
+        XCTAssertEqual(repeats.count,20)
+        XCTAssertEqual(repeats.first?.offset,630)
+        XCTAssertEqual(repeats.last?.offset,1200)
+        XCTAssertTrue(notices.filter {$0.identifier.hasPrefix("focus-end")}.allSatisfy {$0.sound == "alarm_marimba_long.wav"})
+        XCTAssertTrue(Set(notices.map(\.identifier)).isSubset(of:Set(ReminderPlanner.allIdentifiers)))
+    }
+
+    func testSystemAlarmOmitsEndNotification() {
+        let notices = ReminderPlanner.plan(remaining:600,intervalMinutes:0,headline:"A",goalTitle:nil,endRouting:.systemAlarm)
+        XCTAssertEqual(notices.map(\.identifier),["focus-last"])
+    }
+
+    func testSystemSoundUsesDefault() {
+        let notices = ReminderPlanner.plan(remaining:600,intervalMinutes:0,headline:"A",goalTitle:nil,endSound:.system)
+        XCTAssertNil(notices.last?.sound)
+    }
+
+    func testPendingLimitStaysWithinSixtyFour() {
+        let notices = ReminderPlanner.plan(remaining:36000,intervalMinutes:5,headline:"A",goalTitle:nil,endRouting:.repeatingNotifications)
+        XCTAssertLessThanOrEqual(notices.count,64)
+    }
+}
+
+@MainActor
+final class EndAlarmStoreTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970:1_800_000_000)
+
+    private func makeStore(_ defaults: UserDefaults, _ notifications: FakeNotifications, _ alarm: FakeEndAlarm, at date: Date? = nil) -> TimerStore {
+        let fixed = date ?? now
+        return TimerStore(defaults:defaults,now:{fixed},notifications:notifications,liveActivity:FakeLiveActivity(),endAlarm:alarm)
+    }
+    private func withDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
+        let suite = "FocusTimerAlarm-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName:suite)!
+        defer {defaults.removePersistentDomain(forName:suite)}
+        try body(defaults)
+    }
+
+    func testUntilNoticedUsesSystemAlarmWhenAvailable() {
+        withDefaults {defaults in
+            let notifications = FakeNotifications()
+            let alarm = FakeEndAlarm(available:true)
+            let store = makeStore(defaults,notifications,alarm)
+            store.alarmSound = .bell
+            store.endAlertMode = .untilNoticed
+            XCTAssertEqual(alarm.authorizationRequests,1)
+            store.start("作業",minutes:30)
+            XCTAssertEqual(alarm.scheduled.last,EndAlarmRequest(date:now.addingTimeInterval(1800),title:"作業",soundFile:"alarm_bell_long.wav"))
+            XCTAssertFalse(notifications.pending.contains {$0.identifier.hasPrefix("focus-end")})
+            let cancelsBeforePause = alarm.cancelCount
+            store.pause()
+            XCTAssertGreaterThan(alarm.cancelCount,cancelsBeforePause)
+        }
+    }
+
+    func testUntilNoticedFallsBackToRepeatingNotifications() {
+        withDefaults {defaults in
+            let notifications = FakeNotifications()
+            let alarm = FakeEndAlarm(available:false)
+            let store = makeStore(defaults,notifications,alarm)
+            store.endAlertMode = .untilNoticed
+            store.start("作業",minutes:30)
+            XCTAssertTrue(alarm.scheduled.isEmpty)
+            XCTAssertEqual(notifications.pending.filter {$0.identifier.hasPrefix("focus-end-r")}.count,20)
+        }
+    }
+
+    func testAcknowledgeAfterTimeUpRemovesRepeats() throws {
+        try withDefaults {defaults in
+            let notifications = FakeNotifications()
+            let alarm = FakeEndAlarm(available:false)
+            let store = makeStore(defaults,notifications,alarm)
+            store.endAlertMode = .untilNoticed
+            store.start("作業",minutes:30)
+            let later = makeStore(defaults,notifications,alarm,at:now.addingTimeInterval(1900))
+            XCTAssertNotNil(later.session)
+            XCTAssertFalse(later.alarmAcknowledged)
+            later.acknowledgeAlarm()
+            XCTAssertFalse(notifications.pending.contains {$0.identifier.hasPrefix("focus-end-r")})
+            XCTAssertTrue(later.alarmAcknowledged)
+        }
+    }
+
+    func testAcknowledgeBeforeTimeUpKeepsSchedule() {
+        withDefaults {defaults in
+            let notifications = FakeNotifications()
+            let alarm = FakeEndAlarm(available:false)
+            let store = makeStore(defaults,notifications,alarm)
+            store.endAlertMode = .untilNoticed
+            store.start("作業",minutes:30)
+            store.acknowledgeAlarm()
+            XCTAssertEqual(notifications.pending.filter {$0.identifier.hasPrefix("focus-end-r")}.count,20)
+        }
+    }
+
+    func testSettingsPersist() {
+        withDefaults {defaults in
+            let store = makeStore(defaults,FakeNotifications(),FakeEndAlarm(available:true))
+            store.endAlertMode = .untilNoticed
+            store.alarmSound = .beep
+            let reloaded = makeStore(defaults,FakeNotifications(),FakeEndAlarm(available:true))
+            XCTAssertEqual(reloaded.endAlertMode,.untilNoticed)
+            XCTAssertEqual(reloaded.alarmSound,.beep)
+        }
     }
 }
