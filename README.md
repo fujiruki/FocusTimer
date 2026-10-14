@@ -32,6 +32,9 @@
 
 `WatchPrototype/WatchHomeView.swift` は**独立したUI参考コード**であり、Watchへのインストール対象ではありません。Apple Watch対応完了とは見なさないでください。
 
+## 最新版のダウンロード
+https://github.com/fujiruki/FocusTimer/releases/latest/download/FocusTimer-unsigned.ipa （mainへのpushごとに自動更新）
+
 ## ビルド方法
 1. Windowsでこのフォルダの中身をGitHubリポジトリのルートへアップロード。
 2. GitHub Actions → `Build unsigned iPhone IPA` → `Run workflow`。
