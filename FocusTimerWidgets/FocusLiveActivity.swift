@@ -64,10 +64,12 @@ struct FocusActivityView: View {
                     }
                     Text(state.headline).font(.headline).lineLimit(2)
                 }
-                if let goal = state.goalTitle {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("今日のゴール").font(.caption2).foregroundStyle(.white.opacity(0.6))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("今日のゴール").font(.caption2).foregroundStyle(.white.opacity(0.6))
+                    if let goal = state.goalTitle {
                         GoalLine(goal: goal, step: state.stepTitle == state.headline ? nil : state.stepTitle)
+                    } else {
+                        Text("未設定").font(.caption).foregroundStyle(.white.opacity(0.45))
                     }
                 }
                 if state.pausedRemaining == nil {

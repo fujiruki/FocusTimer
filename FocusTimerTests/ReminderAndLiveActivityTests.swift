@@ -201,3 +201,43 @@ final class TimerStoreIntegrationTests: XCTestCase {
         XCTAssertEqual(live.states.last??.headline,"続き")
     }
 }
+
+@MainActor
+final class SessionGoalAndBuildInfoTests: XCTestCase {
+    func testSetSessionGoalLinksGoalAndClearsStep() {
+        let suite = "FocusTimerGoal-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName:suite)!
+        defer {defaults.removePersistentDomain(forName:suite)}
+        let live = FakeLiveActivity()
+        let notifications = FakeNotifications()
+        let now = Date(timeIntervalSince1970:1_800_000_000)
+        let store = TimerStore(defaults:defaults,now:{now},notifications:notifications,liveActivity:live)
+        store.addGoal("見積提出")
+        store.addGoal("自宅に帰る")
+        store.start("片付け",minutes:30)
+        XCTAssertNil(live.states.last??.goalTitle)
+
+        store.setSessionGoal(store.goals[1].id)
+
+        XCTAssertEqual(store.session?.goalID,store.goals[1].id)
+        XCTAssertNil(store.session?.stepID)
+        XCTAssertEqual(live.states.last??.goalTitle,"自宅に帰る")
+        XCTAssertEqual(notifications.pending.first?.body,"残り20分／今日のゴール：自宅に帰る")
+    }
+
+    func testBuildInfoRecentWithinFiveMinutes() {
+        let built = Date(timeIntervalSince1970:1_800_000_000)
+        let info = BuildInfo(info:["CFBundleVersion":"12","FTBuildCommit":"abc1234","FTBuildTime":"2027-01-15T08:00:00Z"])
+        XCTAssertEqual(info.builtAt,built)
+        XCTAssertTrue(info.isRecent(at:built.addingTimeInterval(300)))
+        XCTAssertFalse(info.isRecent(at:built.addingTimeInterval(301)))
+        XCTAssertEqual(info.label(timeZone:TimeZone(identifier:"Asia/Tokyo")!),"ビルド #12（abc1234）　最終更新 1/15 17:00")
+    }
+
+    func testBuildInfoWithoutTime() {
+        let info = BuildInfo(info:["CFBundleVersion":"1","FTBuildCommit":"local","FTBuildTime":""])
+        XCTAssertNil(info.builtAt)
+        XCTAssertFalse(info.isRecent(at:Date()))
+        XCTAssertEqual(info.label(),"ビルド #1（local）")
+    }
+}

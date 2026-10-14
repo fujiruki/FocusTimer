@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var duration = 30
     @State private var selectedGoal: UUID?
     @State private var selectedStep: UUID?
+    @State private var startWithoutGoal = false
     @State private var conditionText = ""
     @State private var laterText = ""
     @State private var showComplete = false
@@ -25,7 +26,9 @@ struct HomeView: View {
                     if let session = store.session {runningView(session)} else {startingView}
                     voicePanel
                     goalsPanel
-                    Text(Self.buildLabel).font(.caption2).foregroundStyle(.secondary).frame(maxWidth:.infinity)
+                    Text(BuildInfo.current.label()).font(.caption2)
+                        .foregroundStyle(BuildInfo.current.isRecent(at:now) ? Color.red : Color.secondary)
+                        .frame(maxWidth:.infinity)
                 }.padding()
             }
             .background(Color(uiColor:.systemGroupedBackground))
@@ -66,7 +69,17 @@ struct HomeView: View {
             Text("今から何をする？").font(.headline)
             TextField("例：納まり検討",text:$workText).textFieldStyle(.roundedBorder)
             HStack {Text("時間");Spacer();Picker("分",selection:$duration) {ForEach([5,10,15,20,25,30,40,45,60,90],id:\.self) {Text("\($0)分").tag($0)}}.pickerStyle(.menu)}
-            Button {let title = workText.trimmingCharacters(in:.whitespacesAndNewlines); if !title.isEmpty {store.start(title,minutes:duration,goal:selectedGoal,step:selectedStep);conditionText="";laterText=""}} label: {
+            if !store.goals.isEmpty {
+                HStack {Text("どのゴールのため？");Spacer();goalPicker(selection:startGoalBinding)}
+            }
+            Button {
+                let title = workText.trimmingCharacters(in:.whitespacesAndNewlines)
+                guard !title.isEmpty else {return}
+                let goal = startGoalBinding.wrappedValue
+                let goalSteps: [WorkStep] = store.goals.first(where: {$0.id == goal})?.steps ?? []
+                let step: UUID? = goalSteps.first(where: {$0.id == selectedStep && $0.title == title})?.id
+                store.start(title,minutes:duration,goal:goal,step:step);conditionText="";laterText=""
+            } label: {
                 Label("この作業を開始",systemImage:"play.fill").frame(maxWidth:.infinity).padding(8)
             }.buttonStyle(.borderedProminent).disabled(workText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
             HStack {Text("途中通知");Spacer();Picker("途中通知",selection:$store.reminderIntervalMinutes) {ForEach(ReminderPlanner.intervalChoices,id:\.self) {Text($0 == 0 ? "オフ" : "\($0)分ごと").tag($0)}}.pickerStyle(.menu)}
@@ -79,6 +92,10 @@ struct HomeView: View {
                 group("今日のゴール") {
                     Text(goal).font(.headline)
                     if let step = LiveActivityContent.stepTitle(for:s,goals:store.goals) {Text("工程：\(step)").font(.subheadline).foregroundStyle(.secondary)}
+                }
+            } else if !store.goals.isEmpty {
+                group("今日のゴール（未設定）") {
+                    goalPicker(selection:Binding(get:{s.goalID},set:{store.setSessionGoal($0)}))
                 }
             }
             group("今回の完成条件") {
@@ -141,7 +158,7 @@ struct HomeView: View {
             HStack {TextField("今日のゴール",text:$goalText).textFieldStyle(.roundedBorder);Button("追加") {store.addGoal(goalText);goalText=""}}
             ForEach(store.goals) {goal in
                 VStack(alignment:.leading,spacing:8) {
-                    Button {selectedGoal=goal.id;selectedStep=nil} label: {HStack {Image(systemName:selectedGoal == goal.id ? "largecircle.fill.circle" : "circle");Text(goal.title).font(.headline);Spacer()}}
+                    Button {selectedGoal=goal.id;selectedStep=nil;startWithoutGoal=false} label: {HStack {Image(systemName:selectedGoal == goal.id ? "largecircle.fill.circle" : "circle");Text(goal.title).font(.headline);Spacer()}}
                     ForEach(goal.steps) {step in
                         HStack {
                             Button {store.toggleStep(goal:goal.id,step:step.id)} label: {Image(systemName:step.done ? "checkmark.circle.fill" : "circle")}
@@ -155,11 +172,21 @@ struct HomeView: View {
             }
         }.cardStyle()
     }
-    static var buildLabel: String {
-        let info = Bundle.main.infoDictionary
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        let commit = info?["FTBuildCommit"] as? String ?? "?"
-        return "ビルド #\(build)（\(commit)）"
+    private var startGoalBinding: Binding<UUID?> {
+        Binding(
+            get: {
+                if startWithoutGoal {return nil}
+                if let selectedGoal, store.goals.contains(where: {$0.id == selectedGoal}) {return selectedGoal}
+                return (store.goals.first {$0.steps.isEmpty || $0.steps.contains {!$0.done}} ?? store.goals.first)?.id
+            },
+            set: {startWithoutGoal = $0 == nil; selectedGoal = $0; selectedStep = nil}
+        )
+    }
+    private func goalPicker(selection: Binding<UUID?>) -> some View {
+        Picker("今日のゴール",selection:selection) {
+            Text("なし").tag(UUID?.none)
+            ForEach(store.goals) {Text($0.title).tag(Optional($0.id))}
+        }.pickerStyle(.menu)
     }
     private func format(_ seconds: TimeInterval) -> String {
         let v=Int(max(0,seconds).rounded(.up));return String(format:"%02d:%02d",v/60,v%60)

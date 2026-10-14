@@ -23,11 +23,13 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         FTBuildCommit: $(FT_BUILD_COMMIT)
+        FTBuildTime: $(FT_BUILD_TIME)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer
         CURRENT_PROJECT_VERSION: "1"
         FT_BUILD_COMMIT: local
+        FT_BUILD_TIME: ""
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"

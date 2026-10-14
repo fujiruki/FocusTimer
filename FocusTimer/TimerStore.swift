@@ -163,6 +163,14 @@ final class TimerStore: ObservableObject {
         scheduleNotices()
         syncLiveActivity()
     }
+    func setSessionGoal(_ goalID: UUID?) {
+        guard var s = session, s.goalID != goalID else {return}
+        s.goalID = goalID
+        s.stepID = nil
+        session = s
+        scheduleNotices()
+        syncLiveActivity()
+    }
     func setLaterNote(_ text: String) {
         guard var s = session else {return}
         s.laterNote = text
