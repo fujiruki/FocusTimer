@@ -59,4 +59,5 @@ jobs:
         run: |
           set -euo pipefail
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest FocusTimer-unsigned.ipa --target "$GITHUB_SHA" --title "最新ビルド #${GITHUB_RUN_NUMBER}" --notes "ビルド #${GITHUB_RUN_NUMBER}（${GITHUB_SHA::7}）。iPhoneのSafariでダウンロードし、SideStoreの「My Apps」→「＋」から選んでインストールします。" --latest
+          cp FocusTimer-unsigned.ipa lab.akeru.focustimer.ipa
+          gh release create latest FocusTimer-unsigned.ipa lab.akeru.focustimer.ipa --target "$GITHUB_SHA" --title "最新ビルド #${GITHUB_RUN_NUMBER}" --notes "ビルド #${GITHUB_RUN_NUMBER}（${GITHUB_SHA::7}）。SideStoreの「My Apps」→「＋」→「Install from URL」に lab.akeru.focustimer.ipa のURLを貼り付けてインストールします（SideStoreはURLのファイル名をBundle IDとして照合するため）。" --latest
