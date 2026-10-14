@@ -24,8 +24,8 @@ struct FocusLiveActivityWidget: Widget {
                     RemainingText(state: context.state).font(.title3.bold())
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if let line = context.state.goalLine {
-                        Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    if let goal = context.state.goalTitle {
+                        Text("ゴール：\(goal)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
             } compactLeading: {
@@ -46,28 +46,51 @@ struct FocusActivityView: View {
 
     var body: some View {
         if family == .small {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(state.headline).font(.headline).lineLimit(2)
+                if let goal = state.goalTitle {
+                    Text(goal).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
                 RemainingText(state: state).font(.title3.bold())
             }
             .padding(8)
         } else {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(state.headlineIsCondition ? "今回の完成条件" : "今の作業").font(.caption2).foregroundStyle(.white.opacity(0.6))
                     Text(state.headline).font(.headline).lineLimit(2)
-                    Spacer(minLength: 8)
-                    RemainingText(state: state).font(.title2.bold())
                 }
-                if let line = state.goalLine {
-                    Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if let goal = state.goalTitle {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("今日のゴール").font(.caption2).foregroundStyle(.white.opacity(0.6))
+                        GoalLine(goal: goal, step: state.stepTitle == state.headline ? nil : state.stepTitle)
+                    }
                 }
-                if state.pausedRemaining == nil {
-                    ProgressView(timerInterval: state.timerRange, countsDown: false, label: {EmptyView()}, currentValueLabel: {EmptyView()})
-                        .tint(.teal)
+                HStack(spacing: 12) {
+                    RemainingText(state: state).font(.title3.bold())
+                    if state.pausedRemaining == nil {
+                        ProgressView(timerInterval: state.timerRange, countsDown: false, label: {EmptyView()}, currentValueLabel: {EmptyView()})
+                            .tint(.teal)
+                    }
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .foregroundStyle(.white)
+        }
+    }
+}
+
+struct GoalLine: View {
+    let goal: String
+    let step: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(goal).font(.subheadline.weight(.semibold)).lineLimit(1).layoutPriority(1)
+            if let step {
+                Text(step).font(.caption).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+            }
         }
     }
 }

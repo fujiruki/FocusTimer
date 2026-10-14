@@ -56,10 +56,13 @@ final class LiveActivityContentTests: XCTestCase {
     func testHeadlineFallsBackToTitle() {
         var session = WorkSession(title:"納まり検討",originalSeconds:1800,runStartedAt:now)
         XCTAssertEqual(LiveActivityContent.make(session:session,goals:[],now:now).headline,"納まり検討")
+        XCTAssertFalse(LiveActivityContent.make(session:session,goals:[],now:now).headlineIsCondition)
         session.finishCondition = "   "
         XCTAssertEqual(LiveActivityContent.make(session:session,goals:[],now:now).headline,"納まり検討")
+        XCTAssertFalse(LiveActivityContent.make(session:session,goals:[],now:now).headlineIsCondition)
         session.finishCondition = "断面図を1枚描く"
         XCTAssertEqual(LiveActivityContent.make(session:session,goals:[],now:now).headline,"断面図を1枚描く")
+        XCTAssertTrue(LiveActivityContent.make(session:session,goals:[],now:now).headlineIsCondition)
     }
 
     func testGoalLine() {
@@ -68,9 +71,16 @@ final class LiveActivityContentTests: XCTestCase {
         let withStep = WorkSession(title:"x",goalID:goal.id,stepID:step.id,originalSeconds:600,runStartedAt:now)
         let goalOnly = WorkSession(title:"x",goalID:goal.id,originalSeconds:600,runStartedAt:now)
         let none = WorkSession(title:"x",originalSeconds:600,runStartedAt:now)
-        XCTAssertEqual(LiveActivityContent.make(session:withStep,goals:[goal],now:now).goalLine,"見積提出 → 断面図")
-        XCTAssertEqual(LiveActivityContent.make(session:goalOnly,goals:[goal],now:now).goalLine,"見積提出")
-        XCTAssertNil(LiveActivityContent.make(session:none,goals:[goal],now:now).goalLine)
+        let stepState = LiveActivityContent.make(session:withStep,goals:[goal],now:now)
+        XCTAssertEqual(stepState.goalTitle,"見積提出")
+        XCTAssertEqual(stepState.stepTitle,"断面図")
+        let goalState = LiveActivityContent.make(session:goalOnly,goals:[goal],now:now)
+        XCTAssertEqual(goalState.goalTitle,"見積提出")
+        XCTAssertNil(goalState.stepTitle)
+        let noneState = LiveActivityContent.make(session:none,goals:[goal],now:now)
+        XCTAssertNil(noneState.goalTitle)
+        XCTAssertNil(noneState.stepTitle)
+        XCTAssertEqual(LiveActivityContent.goalLine(for:withStep,goals:[goal]),"見積提出 → 断面図")
     }
 
     func testRunningTimerRange() {

@@ -175,9 +175,6 @@ final class TimerStore: ObservableObject {
         session = nil
         syncLiveActivity()
     }
-    func goalLine(for session: WorkSession) -> String? {
-        LiveActivityContent.goalLine(for: session, goals: goals)
-    }
     private func syncLiveActivity() {
         guard !loading else {return}
         liveActivity.sync(session.map {LiveActivityContent.make(session: $0, goals: goals, now: now())})

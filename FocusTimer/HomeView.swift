@@ -20,7 +20,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment:.leading,spacing:18) {
+                VStack(alignment:.leading,spacing:24) {
                     dayBar
                     if let session = store.session {runningView(session)} else {startingView}
                     voicePanel
@@ -73,31 +73,47 @@ struct HomeView: View {
         }.cardStyle()
     }
     private func runningView(_ s: WorkSession) -> some View {
-        VStack(alignment:.leading,spacing:12) {
-            if let line = store.goalLine(for:s) {Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)}
-            Text("今の作業").font(.caption).foregroundStyle(.secondary)
-            Text(s.title).font(.title2.bold())
-            TextField("今回の完成条件（任意）",text:$conditionText).textFieldStyle(.roundedBorder).onSubmit {store.setCondition(conditionText)}
-            if !s.finishCondition.isEmpty {Text("完成条件：\(s.finishCondition)").font(.headline)}
+        VStack(alignment:.leading,spacing:22) {
+            if let goal = LiveActivityContent.goalTitle(for:s,goals:store.goals) {
+                group("今日のゴール") {
+                    Text(goal).font(.headline)
+                    if let step = LiveActivityContent.stepTitle(for:s,goals:store.goals) {Text("工程：\(step)").font(.subheadline).foregroundStyle(.secondary)}
+                }
+            }
+            group("今回の完成条件") {
+                Text(s.title).font(.title2.bold())
+                TextField("どこまでやれば完成？（任意）",text:$conditionText).textFieldStyle(.roundedBorder).onSubmit {store.setCondition(conditionText)}
+                if !s.finishCondition.isEmpty {Text(s.finishCondition).font(.headline)}
+            }
             let elapsed = s.elapsed(at:now)
             let remaining = s.remaining(at:now)
-            Text(remaining >= 0 ? format(remaining) : "超過 \(format(-remaining))")
-                .font(.system(size:42,weight:.bold,design:.rounded)).monospacedDigit()
-            ProgressView(value:min(1,elapsed / max(s.originalSeconds,1))).tint(.teal).scaleEffect(x:1,y:4,anchor:.center).padding(.vertical,8)
-            HStack {Text("当初 \(Int(s.originalSeconds/60))分");Spacer();Text("経過 \(format(elapsed))")}.font(.caption)
-            if s.extensionSeconds > 0 {
-                ProgressView(value:min(1,max(0,elapsed-s.originalSeconds)/s.extensionSeconds)).tint(.orange)
-                Text("延長 +\(Int(s.extensionSeconds/60))分（当初バーは維持）").font(.caption)
+            group(s.paused ? "中断中（作業時間は止まっています）" : "残り時間") {
+                Text(remaining >= 0 ? format(remaining) : "超過 \(format(-remaining))")
+                    .font(.system(size:42,weight:.bold,design:.rounded)).monospacedDigit()
+                    .foregroundStyle(s.paused ? .orange : .primary)
+                ProgressView(value:min(1,elapsed / max(s.originalSeconds,1))).tint(.teal).scaleEffect(x:1,y:4,anchor:.center).padding(.vertical,6)
+                HStack {Text("当初 \(Int(s.originalSeconds/60))分");Spacer();Text("経過 \(format(elapsed))")}.font(.caption).foregroundStyle(.secondary)
+                if s.extensionSeconds > 0 {
+                    ProgressView(value:min(1,max(0,elapsed-s.originalSeconds)/s.extensionSeconds)).tint(.orange).padding(.top,6)
+                    Text("延長 +\(Int(s.extensionSeconds/60))分（当初バーは維持）").font(.caption).foregroundStyle(.secondary)
+                }
             }
             HStack(spacing:8) {
                 Button(s.paused ? "再開" : "中断") {s.paused ? store.resume() : store.pause()}.buttonStyle(.borderedProminent)
                 Button("+5分") {store.extendFive()}.buttonStyle(.bordered)
                 Button("終了") {showComplete = true}.buttonStyle(.bordered)
             }.font(.subheadline)
-            TextField("あとでやること・再開メモ",text:$laterText).textFieldStyle(.roundedBorder).onSubmit {store.setLaterNote(laterText)}
-            if !s.laterNote.isEmpty {Text("メモ：\(s.laterNote)").font(.subheadline)}
-            if s.paused {Text("中断中：作業時間は止まっています").foregroundStyle(.orange)}
+            group("あとでやること") {
+                TextField("思いついたことをメモ",text:$laterText).textFieldStyle(.roundedBorder).onSubmit {store.setLaterNote(laterText)}
+                if !s.laterNote.isEmpty {Text(s.laterNote).font(.subheadline)}
+            }
         }.cardStyle().onAppear {conditionText=s.finishCondition;laterText=s.laterNote}
+    }
+    private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment:.leading,spacing:4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            content()
+        }
     }
     private var voicePanel: some View {
         VStack(alignment:.leading,spacing:12) {

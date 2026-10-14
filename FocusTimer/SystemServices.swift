@@ -20,12 +20,21 @@ struct UserNotificationScheduler: NotificationScheduling {
         let content = UNMutableNotificationContent()
         content.title = notice.title
         content.body = notice.body
-        content.sound = .default
+        content.sound = UNNotificationSound(named: UNNotificationSoundName(notice.identifier == "focus-end" ? "focus_end.wav" : "focus_chime.wav"))
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, notice.offset), repeats: false)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: notice.identifier, content: content, trigger: trigger))
     }
     func requestAuthorization() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert,.sound,.badge]) { _,_ in }
+    }
+}
+
+final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = ForegroundNotificationPresenter()
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
     }
 }
 
