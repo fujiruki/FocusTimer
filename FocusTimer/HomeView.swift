@@ -6,7 +6,7 @@ struct HomeView: View {
     @StateObject private var speech = SpeechInput()
     @StateObject private var fieldSpeech = SpeechInput()
     @State private var dictatingField: DictationField?
-    @State private var dictationBase = ""
+    @State private var composer = DictationComposer()
     @State private var now = Date()
     @State private var goalText = ""
     @State private var stepText = ""
@@ -46,7 +46,7 @@ struct HomeView: View {
             .onChange(of:scenePhase) {_,phase in if phase == .active {store.acknowledgeAlarm()}}
             .onChange(of:fieldSpeech.text) {_,recognized in
                 guard let field = dictatingField, !recognized.isEmpty else {return}
-                fieldText(field).wrappedValue = dictationBase + recognized
+                fieldText(field).wrappedValue = composer.compose(recognized)
             }
             .alert("作業を終了しますか？",isPresented:$showComplete) {
                 Button("タイマーだけ終了") {store.finish(markStepDone:false)}
@@ -205,7 +205,7 @@ struct HomeView: View {
     private func goalsPanel(_ proxy: ScrollViewProxy) -> some View {
         VStack(alignment:.leading,spacing:12) {
             Text("今日のゴール → 工程").font(.headline)
-            HStack {TextField("今日のゴール",text:$goalText).textFieldStyle(.roundedBorder);micButton(.goal);Button("追加") {store.addGoal(goalText);goalText=""}}
+            HStack {TextField("今日のゴール",text:$goalText).textFieldStyle(.roundedBorder);micButton(.goal);Button("追加") {store.addGoal(goalText);goalText="";commitDictation(.goal)}}
             ForEach(store.goals) {goal in
                 VStack(alignment:.leading,spacing:8) {
                     Button {selectedGoal=goal.id;selectedStep=nil;startWithoutGoal=false} label: {HStack {Image(systemName:selectedGoal == goal.id ? "largecircle.fill.circle" : "circle");Text(goal.title).font(.headline);Spacer()}}
@@ -217,7 +217,7 @@ struct HomeView: View {
                             Button("開始") {prepare(goal:goal,step:step,proxy:proxy)}.disabled(store.session != nil || step.done)
                         }.font(.subheadline)
                     }
-                    if selectedGoal == goal.id {HStack {TextField("工程を追加",text:$stepText).textFieldStyle(.roundedBorder);micButton(.step);Button("追加") {store.addStep(stepText,goalID:goal.id);stepText=""}}}
+                    if selectedGoal == goal.id {HStack {TextField("工程を追加",text:$stepText).textFieldStyle(.roundedBorder);micButton(.step);Button("追加") {store.addStep(stepText,goalID:goal.id);stepText="";commitDictation(.step)}}}
                 }.padding(10).background(.gray.opacity(0.07),in:RoundedRectangle(cornerRadius:10))
             }
         }.cardStyle()
@@ -249,14 +249,17 @@ struct HomeView: View {
         default:break
         }
     }
+    private func commitDictation(_ field: DictationField) {
+        guard dictatingField == field, fieldSpeech.listening else {return}
+        composer.commit(recognized:fieldSpeech.text)
+    }
     private func micButton(_ field: DictationField) -> some View {
         let active = dictatingField == field && fieldSpeech.listening
         return Button {
             if active {fieldSpeech.stop();return}
             speech.stop()
             fieldSpeech.stop()
-            let current = fieldText(field).wrappedValue
-            dictationBase = current.isEmpty ? "" : current + " "
+            composer.begin(current:fieldText(field).wrappedValue)
             fieldSpeech.text = ""
             dictatingField = field
             fieldSpeech.onFinish = {finishDictation(field)}
