@@ -18,6 +18,7 @@ struct HomeView: View {
     @State private var conditionText = ""
     @State private var laterText = ""
     @State private var showComplete = false
+    @State private var highlightStart = false
     @State private var speechTarget: SpeechTarget = .work
     private let clock = Timer.publish(every:1,on:.main,in:.common).autoconnect()
     enum SpeechTarget: String, CaseIterable {case goal = "今日のゴール", step = "工程", work = "今の作業"}
@@ -25,16 +26,18 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment:.leading,spacing:24) {
-                    dayBar
-                    if let session = store.session {runningView(session)} else {startingView}
-                    goalsPanel
-                    voicePanel
-                    Text(BuildInfo.current.label()).font(.caption2)
-                        .foregroundStyle(BuildInfo.current.isRecent(at:now) ? Color.red : Color.secondary)
-                        .frame(maxWidth:.infinity)
-                }.padding()
+            ScrollViewReader {proxy in
+                ScrollView {
+                    VStack(alignment:.leading,spacing:24) {
+                        dayBar
+                        if let session = store.session {runningView(session)} else {startingView.id(Self.startCardID)}
+                        goalsPanel(proxy)
+                        voicePanel
+                        Text(BuildInfo.current.label()).font(.caption2)
+                            .foregroundStyle(BuildInfo.current.isRecent(at:now) ? Color.red : Color.secondary)
+                            .frame(maxWidth:.infinity)
+                    }.padding()
+                }
             }
             .background(Color(uiColor:.systemGroupedBackground))
             .navigationTitle("フォーカスタイマー")
@@ -74,9 +77,27 @@ struct HomeView: View {
             Text("活動終了までの時間は、実際の作業可能時間とは異なります。").font(.caption2).foregroundStyle(.secondary)
         }.cardStyle()
     }
+    private static let startCardID = "startCard"
+    private var preparedStep: WorkStep? {
+        let title = workText.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard let goal = startGoalBinding.wrappedValue else {return nil}
+        return store.goals.first(where: {$0.id == goal})?.steps.first(where: {$0.id == selectedStep && $0.title == title})
+    }
+    private func prepare(goal: DayGoal, step: WorkStep, proxy: ScrollViewProxy) {
+        selectedGoal = goal.id
+        selectedStep = step.id
+        startWithoutGoal = false
+        workText = step.title
+        withAnimation(.easeInOut(duration:0.45)) {proxy.scrollTo(Self.startCardID,anchor:.top)}
+        withAnimation(.easeOut(duration:0.2)) {highlightStart = true}
+        DispatchQueue.main.asyncAfter(deadline:.now()+1.4) {withAnimation(.easeIn(duration:0.6)) {highlightStart = false}}
+    }
     private var startingView: some View {
         VStack(alignment:.leading,spacing:12) {
-            Text("今から何をする？").font(.headline)
+            VStack(alignment:.leading,spacing:2) {
+                Text("今から何をする？").font(.headline)
+                if let step = preparedStep {Text("工程「\(step.title)」をこの設定で開始します").font(.caption).foregroundStyle(Color.accentColor)}
+            }
             HStack {TextField("例：納まり検討",text:$workText).textFieldStyle(.roundedBorder);micButton(.work)}
             HStack {Text("時間");Spacer();Picker("分",selection:$duration) {ForEach([5,10,15,20,25,30,40,45,60,90],id:\.self) {Text("\($0)分").tag($0)}}.pickerStyle(.menu)}
             if !store.goals.isEmpty {
@@ -108,6 +129,7 @@ struct HomeView: View {
             }.padding(.top,8)
             Text("計画なしでも開始できます").font(.caption).foregroundStyle(.secondary)
         }.cardStyle()
+        .overlay(RoundedRectangle(cornerRadius:16).stroke(Color.accentColor,lineWidth:3).opacity(highlightStart ? 1 : 0))
     }
     private func runningView(_ s: WorkSession) -> some View {
         VStack(alignment:.leading,spacing:22) {
@@ -180,7 +202,7 @@ struct HomeView: View {
             Text("最小試作：音声を文字に変換します。自然文から複数工程や時間を自動抽出する機能は未実装です。").font(.caption).foregroundStyle(.secondary)
         }.cardStyle()
     }
-    private var goalsPanel: some View {
+    private func goalsPanel(_ proxy: ScrollViewProxy) -> some View {
         VStack(alignment:.leading,spacing:12) {
             Text("今日のゴール → 工程").font(.headline)
             HStack {TextField("今日のゴール",text:$goalText).textFieldStyle(.roundedBorder);micButton(.goal);Button("追加") {store.addGoal(goalText);goalText=""}}
@@ -192,7 +214,7 @@ struct HomeView: View {
                             Button {store.toggleStep(goal:goal.id,step:step.id)} label: {Image(systemName:step.done ? "checkmark.circle.fill" : "circle")}
                             Text(step.title).strikethrough(step.done)
                             Spacer()
-                            Button("開始") {selectedGoal=goal.id;selectedStep=step.id;workText=step.title;if store.session == nil {store.start(step.title,minutes:duration,goal:goal.id,step:step.id)}}.disabled(store.session != nil || step.done)
+                            Button("開始") {prepare(goal:goal,step:step,proxy:proxy)}.disabled(store.session != nil || step.done)
                         }.font(.subheadline)
                     }
                     if selectedGoal == goal.id {HStack {TextField("工程を追加",text:$stepText).textFieldStyle(.roundedBorder);micButton(.step);Button("追加") {store.addStep(stepText,goalID:goal.id);stepText=""}}}
