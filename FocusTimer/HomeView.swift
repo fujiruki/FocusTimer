@@ -25,6 +25,7 @@ struct HomeView: View {
                     if let session = store.session {runningView(session)} else {startingView}
                     voicePanel
                     goalsPanel
+                    Text(Self.buildLabel).font(.caption2).foregroundStyle(.secondary).frame(maxWidth:.infinity)
                 }.padding()
             }
             .background(Color(uiColor:.systemGroupedBackground))
@@ -153,6 +154,12 @@ struct HomeView: View {
                 }.padding(10).background(.gray.opacity(0.07),in:RoundedRectangle(cornerRadius:10))
             }
         }.cardStyle()
+    }
+    static var buildLabel: String {
+        let info = Bundle.main.infoDictionary
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let commit = info?["FTBuildCommit"] as? String ?? "?"
+        return "ビルド #\(build)（\(commit)）"
     }
     private func format(_ seconds: TimeInterval) -> String {
         let v=Int(max(0,seconds).rounded(.up));return String(format:"%02d:%02d",v/60,v%60)

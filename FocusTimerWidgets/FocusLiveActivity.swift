@@ -55,23 +55,24 @@ struct FocusActivityView: View {
             }
             .padding(8)
         } else {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(state.headlineIsCondition ? "今回の完成条件" : "今の作業").font(.caption2).foregroundStyle(.white.opacity(0.6))
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(state.headlineIsCondition ? "今回の完成条件" : "今の作業").font(.caption2).foregroundStyle(.white.opacity(0.6))
+                        Spacer(minLength: 8)
+                        RemainingText(state: state).font(.headline)
+                    }
                     Text(state.headline).font(.headline).lineLimit(2)
                 }
                 if let goal = state.goalTitle {
-                    VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("今日のゴール").font(.caption2).foregroundStyle(.white.opacity(0.6))
                         GoalLine(goal: goal, step: state.stepTitle == state.headline ? nil : state.stepTitle)
                     }
                 }
-                HStack(spacing: 12) {
-                    RemainingText(state: state).font(.title3.bold())
-                    if state.pausedRemaining == nil {
-                        ProgressView(timerInterval: state.timerRange, countsDown: false, label: {EmptyView()}, currentValueLabel: {EmptyView()})
-                            .tint(.teal)
-                    }
+                if state.pausedRemaining == nil {
+                    ProgressView(timerInterval: state.timerRange, countsDown: false, label: {EmptyView()}, currentValueLabel: {EmptyView()})
+                        .tint(.teal)
                 }
             }
             .padding(.horizontal, 16)

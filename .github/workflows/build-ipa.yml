@@ -35,7 +35,7 @@ jobs:
       - name: Build for iPhone
         run: |
           set -euo pipefail
-          xcodebuild -project FocusTimer.xcodeproj -scheme FocusTimer -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -project FocusTimer.xcodeproj -scheme FocusTimer -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" FT_BUILD_COMMIT="${GITHUB_SHA::7}" build
       - name: Package IPA
         run: |
           set -euo pipefail

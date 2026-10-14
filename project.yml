@@ -20,9 +20,14 @@ targets:
         NSSpeechRecognitionUsageDescription: 話した作業名をテキストに変換します。
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        FTBuildCommit: $(FT_BUILD_COMMIT)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer
+        CURRENT_PROJECT_VERSION: "1"
+        FT_BUILD_COMMIT: local
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
@@ -35,11 +40,14 @@ targets:
       path: FocusTimerWidgets/Info.plist
       properties:
         CFBundleDisplayName: フォーカスタイマー
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer.widgets
+        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
