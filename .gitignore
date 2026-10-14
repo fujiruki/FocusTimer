@@ -4,4 +4,5 @@ build/
 Payload/
 *.ipa
 FocusTimer/Info.plist
+FocusTimerWidgets/Info.plist
 .DS_Store

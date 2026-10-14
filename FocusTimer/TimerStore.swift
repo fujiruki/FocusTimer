@@ -1,6 +1,5 @@
 import Foundation
 import Combine
-import UserNotifications
 
 struct WorkStep: Identifiable, Codable, Equatable {
     var id = UUID()
@@ -41,19 +40,37 @@ struct SavedPlan: Codable {
 
 @MainActor
 final class TimerStore: ObservableObject {
-    @Published var goals: [DayGoal] = [] { didSet { save() } }
+    @Published var goals: [DayGoal] = [] { didSet { save(); if session != nil {syncLiveActivity()} } }
     @Published var session: WorkSession? { didSet { save() } }
+    @Published var reminderIntervalMinutes: Int = ReminderPlanner.defaultInterval {
+        didSet {
+            guard !loading else {return}
+            if !ReminderPlanner.intervalChoices.contains(reminderIntervalMinutes) {reminderIntervalMinutes = ReminderPlanner.defaultInterval}
+            defaults.set(reminderIntervalMinutes, forKey: Self.intervalKey)
+            scheduleNotices()
+        }
+    }
     @Published var startMinute: Int = 9*60 { didSet { normalizeMinutes(changed:.start) } }
     @Published var endMinute: Int = 18*60 { didSet { normalizeMinutes(changed:.end) } }
     static let storageKey = "focus-timer-daily-v1"
+    static let intervalKey = "focus-timer-reminder-interval"
     private enum MinuteChange {case start,end}
     private let defaults: UserDefaults
     private let now: () -> Date
     private var normalizingMinutes = false
+    private var loading = true
+    private let notifications: NotificationScheduling
+    private let liveActivity: LiveActivityControlling
 
-    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = {Date()}, calendar: Calendar = .current) {
+    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = {Date()}, calendar: Calendar = .current,
+         notifications: NotificationScheduling = UserNotificationScheduler(), liveActivity: LiveActivityControlling = ActivityKitController()) {
         self.defaults = defaults
         self.now = now
+        self.notifications = notifications
+        self.liveActivity = liveActivity
+        if let saved = defaults.object(forKey: Self.intervalKey) as? Int, ReminderPlanner.intervalChoices.contains(saved) {
+            reminderIntervalMinutes = saved
+        }
         if let data = defaults.data(forKey: Self.storageKey),
            let value = try? JSONDecoder().decode(SavedPlan.self, from: data) {
             let sameDay = calendar.isDate(value.date, inSameDayAs: now())
@@ -67,6 +84,8 @@ final class TimerStore: ObservableObject {
             if !sameDay { clearNotices() }
             save()
         }
+        loading = false
+        syncLiveActivity()
     }
     private func save() {
         let data = SavedPlan(date: now(), goals: goals, session: session, startMinute: startMinute, endMinute: endMinute)
@@ -111,6 +130,7 @@ final class TimerStore: ObservableObject {
         guard session == nil, minutes > 0 else { return }
         session = WorkSession(title: title, goalID: goal, stepID: step, originalSeconds: TimeInterval(minutes*60), runStartedAt: now())
         scheduleNotices()
+        syncLiveActivity()
     }
     func pause() {
         guard var s = session, !s.paused else { return }
@@ -119,6 +139,7 @@ final class TimerStore: ObservableObject {
         s.paused = true
         session = s
         clearNotices()
+        syncLiveActivity()
     }
     func resume() {
         guard var s = session, s.paused else { return }
@@ -126,17 +147,21 @@ final class TimerStore: ObservableObject {
         s.paused = false
         session = s
         scheduleNotices()
+        syncLiveActivity()
     }
     func extendFive() {
         guard var s = session else { return }
         s.extensionSeconds += 300
         session = s
         scheduleNotices()
+        syncLiveActivity()
     }
     func setCondition(_ text: String) {
         guard var s = session else {return}
         s.finishCondition = text
         session = s
+        scheduleNotices()
+        syncLiveActivity()
     }
     func setLaterNote(_ text: String) {
         guard var s = session else {return}
@@ -148,28 +173,27 @@ final class TimerStore: ObservableObject {
         if markStepDone, let g = s.goalID, let step = s.stepID { setStepDone(goal:g, step:step) }
         clearNotices()
         session = nil
+        syncLiveActivity()
+    }
+    func goalLine(for session: WorkSession) -> String? {
+        LiveActivityContent.goalLine(for: session, goals: goals)
+    }
+    private func syncLiveActivity() {
+        guard !loading else {return}
+        liveActivity.sync(session.map {LiveActivityContent.make(session: $0, goals: goals, now: now())})
     }
     private func clearNotices() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["focus-half","focus-end","focus-last"])
+        notifications.removePending(ReminderPlanner.allIdentifiers)
     }
     func scheduleNotices() {
+        guard !loading else {return}
         clearNotices()
         guard let s = session, !s.paused else { return }
-        let remaining = s.remaining(at: now())
-        let content = UNMutableNotificationContent()
-        content.title = "作業の確認"
-        content.body = s.finishCondition.isEmpty ? s.title : s.finishCondition
-        content.sound = .default
-        // 応答操作は必須にしない。残り時間の範囲で中間と終了を通知。
-        for (identifier, offset) in [("focus-half",remaining/2),("focus-last",remaining-300),("focus-end",remaining)] {
-            guard offset > 1 else {continue}
-            let c = content.mutableCopy() as! UNMutableNotificationContent
-            if identifier == "focus-end" {c.title = "設定時間になりました"}
-            let request = UNNotificationRequest(identifier:identifier,content:c,trigger:UNTimeIntervalNotificationTrigger(timeInterval:offset,repeats:false))
-            UNUserNotificationCenter.current().add(request)
-        }
+        let notices = ReminderPlanner.plan(remaining: s.remaining(at: now()), intervalMinutes: reminderIntervalMinutes,
+                                           headline: LiveActivityContent.headline(for: s), goalTitle: LiveActivityContent.goalTitle(for: s, goals: goals))
+        for notice in notices {notifications.add(notice)}
     }
     func requestNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert,.sound,.badge]) { _,_ in }
+        notifications.requestAuthorization()
     }
 }

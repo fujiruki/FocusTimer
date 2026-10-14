@@ -68,11 +68,13 @@ struct HomeView: View {
             Button {let title = workText.trimmingCharacters(in:.whitespacesAndNewlines); if !title.isEmpty {store.start(title,minutes:duration,goal:selectedGoal,step:selectedStep);conditionText="";laterText=""}} label: {
                 Label("この作業を開始",systemImage:"play.fill").frame(maxWidth:.infinity).padding(8)
             }.buttonStyle(.borderedProminent).disabled(workText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
+            HStack {Text("途中通知");Spacer();Picker("途中通知",selection:$store.reminderIntervalMinutes) {ForEach(ReminderPlanner.intervalChoices,id:\.self) {Text($0 == 0 ? "オフ" : "\($0)分ごと").tag($0)}}.pickerStyle(.menu)}
             Text("計画なしでも開始できます").font(.caption).foregroundStyle(.secondary)
         }.cardStyle()
     }
     private func runningView(_ s: WorkSession) -> some View {
         VStack(alignment:.leading,spacing:12) {
+            if let line = store.goalLine(for:s) {Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)}
             Text("今の作業").font(.caption).foregroundStyle(.secondary)
             Text(s.title).font(.title2.bold())
             TextField("今回の完成条件（任意）",text:$conditionText).textFieldStyle(.roundedBorder).onSubmit {store.setCondition(conditionText)}

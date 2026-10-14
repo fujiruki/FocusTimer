@@ -41,6 +41,7 @@ jobs:
           set -euo pipefail
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/FocusTimer.app"
           test -d "$APP"
+          test -d "$APP/PlugIns/FocusTimerWidgets.appex"
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry FocusTimer-unsigned.ipa Payload

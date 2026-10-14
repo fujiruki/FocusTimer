@@ -7,7 +7,10 @@ targets:
   FocusTimer:
     type: application
     platform: iOS
-    sources: [FocusTimer]
+    sources: [FocusTimer, Shared]
+    dependencies:
+      - target: FocusTimerWidgets
+        embed: true
     info:
       path: FocusTimer/Info.plist
       properties:
@@ -16,12 +19,30 @@ targets:
         NSMicrophoneUsageDescription: 作業を声で入力するためにマイクを使います。
         NSSpeechRecognitionUsageDescription: 話した作業名をテキストに変換します。
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSSupportsLiveActivities: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        CODE_SIGNING_ALLOWED: NO
+  FocusTimerWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [FocusTimerWidgets, Shared]
+    info:
+      path: FocusTimerWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: フォーカスタイマー
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: lab.akeru.focustimer.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
         CODE_SIGNING_ALLOWED: NO
   FocusTimerTests:
     type: bundle.unit-test
