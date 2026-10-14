@@ -8,6 +8,7 @@ final class SpeechInput: ObservableObject {
     @Published var text = ""
     @Published var listening = false
     @Published var errorMessage: String?
+    var onFinish: (() -> Void)?
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -58,6 +59,7 @@ final class SpeechInput: ObservableObject {
         } catch {errorMessage = error.localizedDescription;stop()}
     }
     func stop() {
+        let wasListening = listening
         recognitionID = UUID()
         let req = request
         let currentTask = task
@@ -69,5 +71,10 @@ final class SpeechInput: ObservableObject {
         currentTask?.cancel()
         listening = false
         try? AVAudioSession.sharedInstance().setActive(false)
+        if wasListening {
+            let finish = onFinish
+            onFinish = nil
+            finish?()
+        }
     }
 }

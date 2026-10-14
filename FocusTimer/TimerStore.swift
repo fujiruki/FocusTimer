@@ -50,10 +50,28 @@ final class TimerStore: ObservableObject {
             scheduleNotices()
         }
     }
+    @Published var endAlertMode: EndAlertMode = .once {
+        didSet {
+            guard !loading else {return}
+            defaults.set(endAlertMode.rawValue, forKey: Self.endModeKey)
+            if endAlertMode == .untilNoticed {endAlarm.requestAuthorization()}
+            scheduleNotices()
+        }
+    }
+    @Published var alarmSound: AlarmSound = .chime {
+        didSet {
+            guard !loading else {return}
+            defaults.set(alarmSound.rawValue, forKey: Self.alarmSoundKey)
+            scheduleNotices()
+        }
+    }
+    @Published private(set) var alarmAcknowledged = false
     @Published var startMinute: Int = 9*60 { didSet { normalizeMinutes(changed:.start) } }
     @Published var endMinute: Int = 18*60 { didSet { normalizeMinutes(changed:.end) } }
     static let storageKey = "focus-timer-daily-v1"
     static let intervalKey = "focus-timer-reminder-interval"
+    static let endModeKey = "focus-timer-end-mode"
+    static let alarmSoundKey = "focus-timer-alarm-sound"
     private enum MinuteChange {case start,end}
     private let defaults: UserDefaults
     private let now: () -> Date
@@ -61,13 +79,18 @@ final class TimerStore: ObservableObject {
     private var loading = true
     private let notifications: NotificationScheduling
     private let liveActivity: LiveActivityControlling
+    private let endAlarm: EndAlarmScheduling
 
     init(defaults: UserDefaults = .standard, now: @escaping () -> Date = {Date()}, calendar: Calendar = .current,
-         notifications: NotificationScheduling = UserNotificationScheduler(), liveActivity: LiveActivityControlling = ActivityKitController()) {
+         notifications: NotificationScheduling = UserNotificationScheduler(), liveActivity: LiveActivityControlling = ActivityKitController(),
+         endAlarm: EndAlarmScheduling? = nil) {
         self.defaults = defaults
         self.now = now
         self.notifications = notifications
         self.liveActivity = liveActivity
+        self.endAlarm = endAlarm ?? AlarmKitScheduler(defaults: defaults)
+        if let raw = defaults.string(forKey: Self.endModeKey), let mode = EndAlertMode(rawValue: raw) {endAlertMode = mode}
+        if let raw = defaults.string(forKey: Self.alarmSoundKey), let sound = AlarmSound(rawValue: raw) {alarmSound = sound}
         if let saved = defaults.object(forKey: Self.intervalKey) as? Int, ReminderPlanner.intervalChoices.contains(saved) {
             reminderIntervalMinutes = saved
         }
@@ -189,14 +212,36 @@ final class TimerStore: ObservableObject {
     }
     private func clearNotices() {
         notifications.removePending(ReminderPlanner.allIdentifiers)
+        endAlarm.cancel()
+    }
+    var endRouting: EndRouting {
+        switch endAlertMode {
+        case .once: return .notification
+        case .untilNoticed: return endAlarm.isAvailable ? .systemAlarm : .repeatingNotifications
+        }
+    }
+    func acknowledgeAlarm() {
+        guard let s = session, s.remaining(at: now()) <= 0 else {return}
+        notifications.removePending(ReminderPlanner.repeatIdentifiers)
+        notifications.removeDelivered(["focus-end"] + ReminderPlanner.repeatIdentifiers)
+        endAlarm.cancel()
+        alarmAcknowledged = true
     }
     func scheduleNotices() {
         guard !loading else {return}
         clearNotices()
+        alarmAcknowledged = false
         guard let s = session, !s.paused else { return }
-        let notices = ReminderPlanner.plan(remaining: s.remaining(at: now()), intervalMinutes: reminderIntervalMinutes,
-                                           headline: LiveActivityContent.headline(for: s), goalTitle: LiveActivityContent.goalTitle(for: s, goals: goals))
+        let remaining = s.remaining(at: now())
+        let headline = LiveActivityContent.headline(for: s)
+        let routing = endRouting
+        let notices = ReminderPlanner.plan(remaining: remaining, intervalMinutes: reminderIntervalMinutes,
+                                           headline: headline, goalTitle: LiveActivityContent.goalTitle(for: s, goals: goals),
+                                           endSound: alarmSound, endRouting: routing)
         for notice in notices {notifications.add(notice)}
+        if routing == .systemAlarm, remaining > 0 {
+            endAlarm.schedule(EndAlarmRequest(date: now().addingTimeInterval(remaining), title: headline, soundFile: alarmSound.longFile))
+        }
     }
     func requestNotifications() {
         notifications.requestAuthorization()

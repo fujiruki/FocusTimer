@@ -4,6 +4,7 @@ import ActivityKit
 
 protocol NotificationScheduling {
     func removePending(_ identifiers: [String])
+    func removeDelivered(_ identifiers: [String])
     func add(_ notice: PlannedNotice)
     func requestAuthorization()
 }
@@ -16,11 +17,14 @@ struct UserNotificationScheduler: NotificationScheduling {
     func removePending(_ identifiers: [String]) {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
     }
+    func removeDelivered(_ identifiers: [String]) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
+    }
     func add(_ notice: PlannedNotice) {
         let content = UNMutableNotificationContent()
         content.title = notice.title
         content.body = notice.body
-        content.sound = UNNotificationSound(named: UNNotificationSoundName(notice.identifier == "focus-end" ? "focus_end.wav" : "focus_chime.wav"))
+        content.sound = notice.sound.map {UNNotificationSound(named: UNNotificationSoundName($0))} ?? .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, notice.offset), repeats: false)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: notice.identifier, content: content, trigger: trigger))
     }

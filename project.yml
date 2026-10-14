@@ -20,6 +20,7 @@ targets:
         NSSpeechRecognitionUsageDescription: 話した作業名をテキストに変換します。
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
+        NSAlarmKitUsageDescription: 作業時間の終了を、止めるまで鳴るアラームで知らせます。
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         FTBuildCommit: $(FT_BUILD_COMMIT)
