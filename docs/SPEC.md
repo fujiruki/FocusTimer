@@ -1,6 +1,6 @@
 # FocusTimer 仕様目次
 
-最終更新: 2026-10-14
+最終更新: 2026-10-15
 
 | ファイル | 概要 | 最終更新 |
 |:--|:--|:--|
@@ -10,6 +10,7 @@
 | [spec/04_データ設計.md](spec/04_データ設計.md) | UserDefaults保存形式、Live Activityの属性 | 2026-10-14 |
 | [spec/05_技術設計.md](spec/05_技術設計.md) | SwiftUI、XcodeGen、GitHub Actions、Widget Extension、無料署名 | 2026-10-14 |
 | [spec/06_変更履歴.md](spec/06_変更履歴.md) | 仕様変更の経緯 | 2026-10-14 |
+| [decisions/README.md](decisions/README.md) | 設計判断記録（ADR）。各仕様がなぜそうなったか（背景・選択肢・理由・残るリスク） | 2026-10-15 |
 
 ## 出典
 
