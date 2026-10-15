@@ -123,6 +123,7 @@ final class TimerStoreIntegrationTests: XCTestCase {
     override func setUp() {
         suiteName = "FocusTimerIntegration-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName:suiteName)!
+        defaults.set(EndAlertMode.once.rawValue,forKey:TimerStore.endModeKey)
         notifications = FakeNotifications()
         live = FakeLiveActivity()
     }
@@ -357,6 +358,24 @@ final class EndAlarmStoreTests: XCTestCase {
             store.start("作業",minutes:30)
             store.acknowledgeAlarm()
             XCTAssertEqual(notifications.pending.filter {$0.identifier.hasPrefix("focus-end-r")}.count,20)
+        }
+    }
+
+    func testDefaultEndModeIsUntilNoticed() {
+        withDefaults {defaults in
+            let alarm = FakeEndAlarm(available:true)
+            let store = makeStore(defaults,FakeNotifications(),alarm)
+            XCTAssertEqual(store.endAlertMode,.untilNoticed)
+            store.start("作業",minutes:30)
+            XCTAssertEqual(alarm.scheduled.count,1)
+        }
+    }
+
+    func testSavedOnceModeIsKept() {
+        withDefaults {defaults in
+            defaults.set(EndAlertMode.once.rawValue,forKey:TimerStore.endModeKey)
+            let store = makeStore(defaults,FakeNotifications(),FakeEndAlarm(available:true))
+            XCTAssertEqual(store.endAlertMode,.once)
         }
     }
 
