@@ -36,6 +36,9 @@ struct HomeView: View {
                         Text(BuildInfo.current.label()).font(.caption2)
                             .foregroundStyle(BuildInfo.current.isRecent(at:now) ? Color.red : Color.secondary)
                             .frame(maxWidth:.infinity)
+                        Link("AKERU LAB がつくりました",destination:URL(string:"https://akerulab.com/")!)
+                            .font(.caption2).foregroundStyle(.secondary)
+                            .frame(maxWidth:.infinity)
                     }.padding()
                 }
             }
