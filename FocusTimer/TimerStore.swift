@@ -50,7 +50,7 @@ final class TimerStore: ObservableObject {
             scheduleNotices()
         }
     }
-    @Published var endAlertMode: EndAlertMode = .once {
+    @Published var endAlertMode: EndAlertMode = .untilNoticed {
         didSet {
             guard !loading else {return}
             defaults.set(endAlertMode.rawValue, forKey: Self.endModeKey)
