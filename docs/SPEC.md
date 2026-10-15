@@ -6,7 +6,7 @@
 |:--|:--|:--|
 | [spec/01_概要.md](spec/01_概要.md) | 目的・利用者・解決する課題（目標を忘れる問題） | 2026-10-14 |
 | [spec/02_機能仕様.md](spec/02_機能仕様.md) | 機能一覧、途中リマインド通知（B）、Live Activity（A） | 2026-10-15 |
-| [spec/03_画面設計.md](spec/03_画面設計.md) | ホーム画面、作業中画面、ロック画面／Dynamic Island／Watchスマートスタック | 2026-10-14 |
+| [spec/03_画面設計.md](spec/03_画面設計.md) | ホーム画面、作業中画面、ロック画面／Dynamic Island／Watchスマートスタック | 2026-10-15 |
 | [spec/04_データ設計.md](spec/04_データ設計.md) | UserDefaults保存形式、Live Activityの属性 | 2026-10-14 |
 | [spec/05_技術設計.md](spec/05_技術設計.md) | SwiftUI、XcodeGen、GitHub Actions、Widget Extension、無料署名 | 2026-10-14 |
 | [spec/06_変更履歴.md](spec/06_変更履歴.md) | 仕様変更の経緯 | 2026-10-15 |
